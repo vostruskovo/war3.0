@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>⚡ TACTICAL MAP · ROTATE [R] · INVERT [I] · FULLY FIXED</title>
+    <style>
+        * {
+            user-select: none;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a1f12, #030b05);
+            font-family: 'Segoe UI', 'Georgia', serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .war-room {
+            background: #1a150edd;
+            backdrop-filter: blur(3px);
+            border-radius: 48px;
+            padding: 20px;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.7);
+            border: 3px solid #dba551;
+            width: fit-content;
+            max-width: 98vw;
+        }
+
+        .top-command-bar {
+            background: #18140cee;
+            backdrop-filter: blur(12px);
+            border-radius: 60px;
+            padding: 8px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid #e2bc6e;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .unit-palette-compact { 
+            display: flex; 
+            gap: 4px; 
+            background: #0f0a05aa; 
+            padding: 4px 10px; 
+            border-radius: 60px; 
+        }
+        
+        .unit-card-compact { 
+            background: #2f2a1f; 
+            border-radius: 40px; 
+            padding: 4px 8px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            gap: 6px; 
+            border: 2px solid #b89048;
+            transition: all 0.1s ease;
+        }
+        
+        .unit-card-compact.selected { 
+            background: #5f794b; 
+            border: 2px solid #ffd966; 
+            box-shadow: 0 0 8px gold;
+            transform: scale(1.02);
+        }
+        
+        .palette-preview {
+            width: 32px;
+            height: 32px;
+            display: inline-block;
+        }
+        
+        .flag-dropdown {
+            background: #3c2e1c;
+            color: #ffefcf;
+            font-weight: bold;
+            border: 2px solid #e6bc6e;
+            border-radius: 40px;
+            padding: 5px 12px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+        
+        .flag-dropdown option {
+            background: #2f2a1f;
+            color: #ffefcf;
+        }
+        
+        .btn-compact { 
+            background: #3c2b1a; 
+            border: none; 
+            font-weight: bold; 
+            padding: 5px 14px; 
+            border-radius: 60px; 
+            color: #fce6b4; 
+            cursor: pointer; 
+            font-size: 0.85rem;
+        }
+        
+        .btn-compact:active { transform: translateY(2px); }
+        .reset-btn { background: #8b3a2a; }
+        .apply-btn { background: #2a5f6b; }
+        .download-btn { background: #2a6b3a; }
+        
+        .map-container {
+            background: #0a1a0f;
+            border-radius: 28px;
+            padding: 12px;
+            box-shadow: inset 0 0 0 4px #ecd99b, inset 0 0 0 10px #5a3e1f;
+        }
+
+        .world-map {
+            position: relative;
+            width: 2000px;
+            height: 1200px;
+            background: #1a6b7a;
+            border-radius: 20px;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        #mapCanvas { pointer-events: none; z-index: 1; }
+        #unitCanvas { pointer-events: auto; z-index: 2; cursor: crosshair; }
+
+        .bottom-info {
+            margin-top: 12px;
+            background: #020812cc;
+            border-radius: 16px;
+            padding: 10px;
+            font-family: monospace;
+            color: #d4f0b0;
+            text-align: center;
+            font-size: 0.85rem;
+            border: 1px solid #ad8842;
+        }
+
+        .hotkey-hint {
+            background: #2c2418;
+            border-radius: 24px;
+            padding: 2px 12px;
+            font-weight: bold;
+        }
+
+        @media (max-width: 2100px) {
+            .world-map { width: 1800px; height: 1080px; }
+        }
+        @media (max-width: 1700px) {
+            .world-map { width: 1400px; height: 840px; }
+        }
+        @media (max-width: 1500px) {
+            .world-map { width: 1200px; height: 720px; }
+        }
+    </style>
+</head>
+<body>
+<div class="war-room">
+    <div class="top-command-bar">
+        <div class="unit-palette-compact" id="unitPalette"></div>
+        <select id="flagDropdown" class="flag-dropdown">
+            <option value="🇺🇸|USA|#b22234|#3c3b6e">🇺🇸 USA</option>
+            <option value="🇬🇧|UK|#012169|#c8102e">🇬🇧 UK</option>
+            <option value="🇫🇷|FRA|#0055a4|#ef4135">🇫🇷 FRA</option>
+            <option value="🇩🇪|GER|#000000|#dd0000">🇩🇪 GER</option>
+            <option value="🇮🇹|ITA|#009246|#ce2b37">🇮🇹 ITA</option>
+            <option value="🇪🇸|ESP|#aa151b|#f1bf00">🇪🇸 ESP</option>
+            <option value="🇷🇺|RUS|#0033a0|#da291c">🇷🇺 RUS</option>
+            <option value="🇨🇦|CAN|#ff0000|#ffffff">🇨🇦 CAN</option>
+            <option value="🇧🇷|BRA|#009c3b|#ffdf00">🇧🇷 BRA</option>
+            <option value="🇯🇵|JPN|#bc002d|#ffffff">🇯🇵 JPN</option>
+            <option value="🇨🇳|CHN|#de2910|#ffde00">🇨🇳 CHN</option>
+            <option value="🇮🇳|IND|#ff9933|#138808">🇮🇳 IND</option>
+            <option value="🇮🇱|ISR|#0038b8|#ffffff">🇮🇱 ISR</option>
+            <option value="🇮🇷|IRN|#da0000|#ffffff">🇮🇷 IRN</option>
+            <option value="🇵🇸|PLE|#007a3d|#000000">🇵🇸 PLE</option>
+            <option value="🇪🇬|EGY|#ce1126|#000000">🇪🇬 EGY</option>
+            <option value="🇹🇷|TUR|#e30a17|#ffffff">🇹🇷 TUR</option>
+            <option value="🇵🇰|PAK|#01411c|#ffffff">🇵🇰 PAK</option>
+        </select>
+        <button class="btn-compact apply-btn" id="setDefaultFlagBtn">🏁 SET DEFAULT</button>
+        <button class="btn-compact download-btn" id="downloadBtn">📸 DOWNLOAD</button>
+        <button class="btn-compact reset-btn" id="resetBtn">🗑️ CLEAR ALL</button>
+    </div>
+
+    <div class="map-container">
+        <div class="world-map" id="worldMapContainer">
+            <canvas id="mapCanvas" width="2000" height="1200"></canvas>
+            <canvas id="unitCanvas" width="2000" height="1200"></canvas>
+        </div>
+        <div class="bottom-info" id="infoBar">
+            🔴 SELECT A UNIT (click or arrow keys) → PRESS <span class="hotkey-hint">[R]</span> TO ROTATE → PRESS <span class="hotkey-hint">[I]</span> TO INVERT (mirror)
+        </div>
+    </div>
+</div>
+
+<script>
+    // ========== UNIT DRAWING FUNCTIONS (SAME FOR PALETTE AND MAP) ==========
+    function drawTank(ctx, x, y, color1, color2) {
+        ctx.fillStyle = "#3a3a2a";
+        ctx.fillRect(x-18, y-8, 36, 6);
+        ctx.fillRect(x-18, y+2, 36, 6);
+        ctx.fillStyle = color1;
+        ctx.fillRect(x-16, y-6, 32, 12);
+        ctx.fillStyle = color2;
+        ctx.beginPath();
+        ctx.ellipse(x, y-4, 12, 8, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x+8, y-6, 18, 4);
+        ctx.fillStyle = "#ffcc00";
+        ctx.fillRect(x-3, y-5, 2, 2);
+        ctx.fillRect(x+1, y-5, 2, 2);
+    }
+    
+    function drawHeli(ctx, x, y, color1, color2) {
+        ctx.fillStyle = color1;
+        ctx.fillRect(x-10, y-4, 20, 8);
+        ctx.fillStyle = "#888";
+        ctx.fillRect(x-25, y-12, 50, 3);
+        ctx.fillRect(x-3, y-22, 6, 20);
+        ctx.fillRect(x+12, y-2, 16, 3);
+        ctx.fillStyle = "#88ccff";
+        ctx.fillRect(x-6, y-3, 8, 4);
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x-12, y+4, 8, 2);
+        ctx.fillRect(x+4, y+4, 8, 2);
+    }
+    
+    function drawSoldier(ctx, x, y, color1, color2) {
+        ctx.fillStyle = color1;
+        ctx.fillRect(x-8, y-15, 16, 6);
+        ctx.fillStyle = "#dbb87c";
+        ctx.beginPath();
+        ctx.arc(x, y-9, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = color2;
+        ctx.fillRect(x-6, y-3, 12, 12);
+        ctx.fillStyle = "#4a3a2a";
+        ctx.fillRect(x+6, y-7, 16, 3);
+        ctx.fillRect(x+16, y-9, 3, 8);
+        ctx.fillStyle = "#2a2a1a";
+        ctx.fillRect(x-7, y+7, 5, 3);
+        ctx.fillRect(x+2, y+7, 5, 3);
+    }
+    
+    function drawShip(ctx, x, y, color1, color2) {
+        ctx.fillStyle = color1;
+        ctx.beginPath();
+        ctx.moveTo(x-22, y);
+        ctx.lineTo(x-14, y+10);
+        ctx.lineTo(x+14, y+10);
+        ctx.lineTo(x+22, y);
+        ctx.fill();
+        ctx.fillStyle = color2;
+        ctx.fillRect(x-18, y-4, 36, 6);
+        ctx.fillStyle = "#8B7355";
+        ctx.fillRect(x-3, y-28, 5, 28);
+        ctx.fillStyle = "#cc3333";
+        ctx.fillRect(x+2, y-28, 14, 6);
+        ctx.fillStyle = "#aaa";
+        ctx.beginPath();
+        ctx.arc(x-12, y-14, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x+9, y-9, 10, 5);
+    }
+    
+    function drawPlane(ctx, x, y, color1, color2) {
+        ctx.fillStyle = color1;
+        ctx.fillRect(x-20, y-4, 40, 7);
+        ctx.fillStyle = color2;
+        ctx.beginPath();
+        ctx.moveTo(x-8, y-4);
+        ctx.lineTo(x-20, y-16);
+        ctx.lineTo(x-8, y-10);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x-8, y+3);
+        ctx.lineTo(x-20, y+15);
+        ctx.lineTo(x-8, y+9);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(x+14, y-4);
+        ctx.lineTo(x+26, y-12);
+        ctx.lineTo(x+22, y-4);
+        ctx.fill();
+        ctx.fillStyle = "#88ccff";
+        ctx.fillRect(x-12, y-6, 12, 4);
+        ctx.fillStyle = "#ff6600";
+        ctx.fillRect(x+16, y-2, 6, 3);
+    }
+    
+    function drawArtillery(ctx, x, y, color1, color2) {
+        ctx.fillStyle = color1;
+        ctx.fillRect(x-16, y+2, 32, 6);
+        ctx.fillStyle = "#3a3a2a";
+        ctx.beginPath();
+        ctx.arc(x-10, y+9, 6, 0, Math.PI*2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(x+10, y+9, 6, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "#555";
+        ctx.fillRect(x-4, y-14, 28, 5);
+        ctx.fillStyle = color2;
+        ctx.fillRect(x-14, y-9, 16, 11);
+        ctx.fillStyle = "#ffcc44";
+        ctx.fillRect(x+20, y-13, 6, 4);
+    }
+    
+    const UNIT_TYPES = {
+        tank: { name: "TANK", size: 44, health: 45, draw: drawTank },
+        heli: { name: "HELI", size: 42, health: 38, draw: drawHeli },
+        soldier: { name: "SOLDIER", size: 36, health: 22, draw: drawSoldier },
+        ship: { name: "SHIP", size: 46, health: 52, draw: drawShip },
+        plane: { name: "PLANE", size: 42, health: 48, draw: drawPlane },
+        artillery: { name: "ARTILLERY", size: 40, health: 55, draw: drawArtillery }
+    };
+    
+    // Default flag
+    let defaultFlag = "🇺🇸";
+    let defaultCode = "USA";
+    let defaultColor1 = "#b22234";
+    let defaultColor2 = "#3c3b6e";
+    
+    class Unit {
+        constructor(id, type, x, y) {
+            this.id = id;
+            this.type = type;
+            this.x = x;
+            this.y = y;
+            this.health = UNIT_TYPES[type].health;
+            this.rotation = 0;
+            this.inverted = false;
+            this.flag = defaultFlag;
+            this.code = defaultCode;
+            this.color1 = defaultColor1;
+            this.color2 = defaultColor2;
+        }
+        // FIXED: ROTATE AND INVERT METHODS - same robust logic as x3
+        rotate() { 
+            this.rotation = (this.rotation + 90) % 360; 
+        }
+        invert() { 
+            this.inverted = !this.inverted; 
+        }
+        setFlag(flag, code, c1, c2) { this.flag = flag; this.code = code; this.color1 = c1; this.color2 = c2; }
+    }
+    
+    let units = [];
+    let nextId = 1;
+    let selectedUnitType = "tank";
+    let selectedUnitId = null;
+    
+    // Drag state
+    let dragTargetId = null, dragStartX = 0, dragStartY = 0, isDragging = false, dragStarted = false;
+    
+    const mapCanvas = document.getElementById("mapCanvas");
+    const unitCanvas = document.getElementById("unitCanvas");
+    const ctxMap = mapCanvas.getContext("2d");
+    const ctxUnit = unitCanvas.getContext("2d");
+    let mapWidth = 2000, mapHeight = 1200;
+    
+    const resetBtn = document.getElementById("resetBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const unitPalette = document.getElementById("unitPalette");
+    const infoBar = document.getElementById("infoBar");
+    const flagDropdown = document.getElementById("flagDropdown");
+    const setDefaultFlagBtn = document.getElementById("setDefaultFlagBtn");
+    
+    let bgImage = new Image();
+    let imageLoaded = false;
+    bgImage.src = "https://gisgeography.com/wp-content/uploads/2022/04/High-Resolution-World-Map-1536x768.jpg";
+    bgImage.onload = () => { imageLoaded = true; drawWorldMap(); };
+    bgImage.onerror = () => { imageLoaded = true; drawWorldMap(); };
+    
+    function drawWorldMap() {
+        if (imageLoaded && bgImage.complete && bgImage.naturalWidth > 0) {
+            ctxMap.drawImage(bgImage, 0, 0, mapWidth, mapHeight);
+        } else {
+            ctxMap.fillStyle = "#1a6b7a";
+            ctxMap.fillRect(0, 0, mapWidth, mapHeight);
+            ctxMap.fillStyle = "#fff5c0";
+            ctxMap.font = "bold 42px 'Segoe UI'";
+            ctxMap.fillText("🗺️ WORLD MAP", mapWidth/2-150, mapHeight/2);
+        }
+        ctxMap.strokeStyle = "#d6a53a";
+        ctxMap.lineWidth = 5;
+        ctxMap.strokeRect(8, 8, mapWidth-16, mapHeight-16);
+    }
+    
+    // CRITICAL: drawUnitOnCanvas with correct transform handling (rotation + inversion)
+    function drawUnitOnCanvas(ctx, unit, isSelected) {
+        const def = UNIT_TYPES[unit.type];
+        const size = def.size;
+        
+        ctx.save();
+        ctx.translate(unit.x, unit.y);
+        // Apply rotation if any (working as in x3)
+        if (unit.rotation !== 0) {
+            ctx.rotate(unit.rotation * Math.PI / 180);
+        }
+        // Apply inversion (mirror) if active (working as in x3)
+        if (unit.inverted) {
+            ctx.scale(-1, 1);
+        }
+        
+        if (isSelected) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = "gold";
+        } else {
+            ctx.shadowBlur = 5;
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+        }
+        
+        // Background ring (always visible)
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2 + 5, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected ? "#ffdd88" : "#ffd966";
+        ctx.fill();
+        
+        // Colored base (national colors)
+        const grad = ctx.createLinearGradient(-size/2, -size/2, size/2, size/2);
+        grad.addColorStop(0, unit.color1);
+        grad.addColorStop(1, unit.color2);
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = isSelected ? "#ffd700" : "#e8c87a";
+        ctx.lineWidth = isSelected ? 4 : 2;
+        ctx.stroke();
+        
+        // Inner circle background
+        ctx.beginPath();
+        ctx.arc(0, 0, size/2 - 7, 0, Math.PI * 2);
+        ctx.fillStyle = "#f5ecce";
+        ctx.fill();
+        
+        // Draw the military icon (type-specific)
+        def.draw(ctx, 0, 0, unit.color1, unit.color2);
+        
+        // Flag emoji
+        ctx.font = `28px "Segoe UI Emoji"`;
+        ctx.fillStyle = "#000";
+        ctx.fillText(unit.flag, -14, -30);
+        
+        // Country CODE - WHITE with black outline for readability
+        ctx.font = "bold 16px 'Segoe UI', monospace";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#000000";
+        ctx.strokeText(unit.code, -12, -44);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillText(unit.code, -12, -44);
+        
+        // Health bar
+        const healthPercent = unit.health / def.health;
+        const barWidth = size + 6;
+        const barHeight = 7;
+        const barX = -barWidth/2;
+        const barY = -size/2 - 10;
+        ctx.fillStyle = "#330000";
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.fillStyle = healthPercent > 0.5 ? "#44ff44" : (healthPercent > 0.25 ? "#ffaa44" : "#ff4444");
+        ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+        
+        ctx.font = "bold 11px monospace";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(`❤️${unit.health}`, -15, 32);
+        
+        // Indicators for rotation and inversion (visual feedback)
+        if (unit.rotation !== 0) {
+            ctx.font = "bold 14px monospace";
+            ctx.fillStyle = "#ffaa44";
+            ctx.fillText("↻", 24, -24);
+        }
+        if (unit.inverted) {
+            ctx.font = "bold 14px monospace";
+            ctx.fillStyle = "#44aaff";
+            ctx.fillText("⇄", -32, -24);
+        }
+        if (isSelected) {
+            ctx.font = "bold 16px monospace";
+            ctx.fillStyle = "#ffd700";
+            ctx.fillText("🔘", 28, -28);
+        }
+        
+        ctx.restore();
+    }
+    
+    function drawUnits() {
+        ctxUnit.clearRect(0, 0, mapWidth, mapHeight);
+        units.forEach(unit => {
+            drawUnitOnCanvas(ctxUnit, unit, (selectedUnitId === unit.id));
+        });
+    }
+    
+    // ========== INTELLIGENT ARROW NAVIGATION (from x3 style but adapted) ==========
+    function getNearestUnitInDirection(dx, dy) {
+        if (units.length === 0) return null;
+        if (selectedUnitId === null) return units[0];
+        const current = units.find(u => u.id === selectedUnitId);
+        if (!current) return units[0];
+        
+        let best = null;
+        let bestScore = -Infinity;
+        for (let u of units) {
+            if (u.id === current.id) continue;
+            const deltaX = u.x - current.x;
+            const deltaY = u.y - current.y;
+            const dist = Math.hypot(deltaX, deltaY);
+            if (dist < 1) continue;
+            const angle = Math.atan2(dy, dx);
+            const unitAngle = Math.atan2(deltaY, deltaX);
+            let angleDiff = Math.abs(unitAngle - angle);
+            angleDiff = Math.min(angleDiff, Math.PI * 2 - angleDiff);
+            if (angleDiff > Math.PI / 2.5) continue;
+            const score = (1 - angleDiff / Math.PI) * 100 - dist / 30;
+            if (score > bestScore) { bestScore = score; best = u; }
+        }
+        return best || (units.length > 1 ? units.find(u => u.id !== current.id) : null);
+    }
+    
+    function navigateToDirection(dx, dy, dirName) {
+        if (units.length === 0) { infoBar.innerHTML = "⚠️ No units! Click map to deploy."; return; }
+        const target = getNearestUnitInDirection(dx, dy);
+        if (target) {
+            selectedUnitId = target.id;
+            drawUnits();
+            infoBar.innerHTML = `🎯 ${dirName}: ${target.flag} ${target.code} — Press [R] ROTATE | [I] INVERT`;
+            flashUnit(target);
+        } else {
+            infoBar.innerHTML = `⚠️ No units ${dirName}`;
+        }
+    }
+    
+    function flashUnit(unit) {
+        ctxUnit.save();
+        ctxUnit.beginPath();
+        ctxUnit.arc(unit.x, unit.y, UNIT_TYPES[unit.type].size/2 + 18, 0, Math.PI * 2);
+        ctxUnit.strokeStyle = "#ffff00";
+        ctxUnit.lineWidth = 5;
+        ctxUnit.stroke();
+        setTimeout(() => drawUnits(), 150);
+        ctxUnit.restore();
+    }
+    
+    function getUnitAt(x, y) {
+        for (let i = units.length-1; i >= 0; i--) {
+            const u = units[i];
+            const size = UNIT_TYPES[u.type].size;
+            if (Math.hypot(x - u.x, y - u.y) < size/2 + 10) return u;
+        }
+        return null;
+    }
+    
+    function setDefaultFlag() {
+        const parts = flagDropdown.value.split('|');
+        defaultFlag = parts[0];
+        defaultCode = parts[1];
+        defaultColor1 = parts[2];
+        defaultColor2 = parts[3];
+        infoBar.innerHTML = `🏁 DEFAULT: ${defaultFlag} ${defaultCode} — New units will use this`;
+    }
+    
+    function changeSelectedUnitFlag() {
+        if (selectedUnitId === null) {
+            infoBar.innerHTML = "⚠️ Select a unit first (click it), then RIGHT-CLICK to change flag!";
+            return;
+        }
+        const unit = units.find(u => u.id === selectedUnitId);
+        if (unit) {
+            const parts = flagDropdown.value.split('|');
+            unit.setFlag(parts[0], parts[1], parts[2], parts[3]);
+            drawUnits();
+            infoBar.innerHTML = `🏁 ${unit.code} flag updated to ${parts[0]} ${parts[1]}`;
+        }
+    }
+    
+    // ========== ROTATE AND INVERT - NOW FULLY WORKING (FIXED) ==========
+    function rotateSelected() {
+        if (selectedUnitId === null) {
+            infoBar.innerHTML = "⚠️ No unit selected! Click a unit or use arrow keys, then press R to rotate.";
+            return;
+        }
+        const unit = units.find(u => u.id === selectedUnitId);
+        if (unit) {
+            unit.rotate();   // Uses fixed rotate method
+            drawUnits();
+            infoBar.innerHTML = `🔄 ROTATED 90° → ${unit.code} ${UNIT_TYPES[unit.type].name} (rotation: ${unit.rotation}°) — Press I to invert`;
+        }
+    }
+    
+    function invertSelected() {
+        if (selectedUnitId === null) {
+            infoBar.innerHTML = "⚠️ No unit selected! Click a unit or use arrow keys, then press I to invert.";
+            return;
+        }
+        const unit = units.find(u => u.id === selectedUnitId);
+        if (unit) {
+            unit.invert();   // Uses fixed invert method
+            drawUnits();
+            infoBar.innerHTML = `🪞 INVERTED → ${unit.code} ${UNIT_TYPES[unit.type].name} ${unit.inverted ? "mirrored ✓" : "normal"} — Press R to rotate`;
+        }
+    }
+    
+    function selectUnit(unit) {
+        selectedUnitId = unit ? unit.id : null;
+        if (unit) {
+            infoBar.innerHTML = `✨ SELECTED: ${unit.flag} ${unit.code} ${UNIT_TYPES[unit.type].name} — Press [R] ROTATE | [I] INVERT | Right-click change flag`;
+        } else {
+            infoBar.innerHTML = `✨ Selection cleared`;
+        }
+        drawUnits();
+    }
+    
+    function addUnit(type, mx, my) {
+        let x = Math.min(mapWidth - 60, Math.max(60, mx));
+        let y = Math.min(mapHeight - 60, Math.max(60, my));
+        for (let u of units) {
+            if (Math.hypot(u.x - x, u.y - y) < 45) {
+                infoBar.innerHTML = "⚠️ Too close to another unit!";
+                return false;
+            }
+        }
+        const unit = new Unit(nextId++, type, x, y);
+        units.push(unit);
+        drawUnits();
+        infoBar.innerHTML = `✅ DEPLOYED: ${defaultFlag} ${defaultCode} ${UNIT_TYPES[type].name} — [R] rotate | [I] invert`;
+        return true;
+    }
+    
+    function deleteUnit(unit) {
+        const idx = units.findIndex(u => u.id === unit.id);
+        if (idx !== -1) {
+            units.splice(idx, 1);
+            if (selectedUnitId === unit.id) selectedUnitId = units.length > 0 ? units[0].id : null;
+            drawUnits();
+            infoBar.innerHTML = `🗑️ DELETED: ${unit.flag} ${unit.code}`;
+        }
+    }
+    
+    function deleteSelected() {
+        if (selectedUnitId === null) { infoBar.innerHTML = "⚠️ No unit selected!"; return; }
+        const unit = units.find(u => u.id === selectedUnitId);
+        if (unit) deleteUnit(unit);
+    }
+    
+    function clearAll() {
+        units = [];
+        nextId = 1;
+        selectedUnitId = null;
+        drawUnits();
+        infoBar.innerHTML = "🗑️ ALL CLEARED! Set flag, click map to deploy. [R] rotate [I] invert";
+    }
+    
+    function downloadMap() {
+        const temp = document.createElement('canvas');
+        temp.width = mapWidth;
+        temp.height = mapHeight;
+        const tCtx = temp.getContext('2d');
+        tCtx.drawImage(mapCanvas, 0, 0);
+        tCtx.drawImage(unitCanvas, 0, 0);
+        tCtx.strokeStyle = "#d6a53a";
+        tCtx.lineWidth = 6;
+        tCtx.strokeRect(10, 10, mapWidth-20, mapHeight-20);
+        tCtx.font = "bold 18px monospace";
+        tCtx.fillStyle = "#ffefb0";
+        tCtx.fillText(`UNITS: ${units.length} | ${defaultFlag} ${defaultCode}`, 20, mapHeight-25);
+        const link = document.createElement('a');
+        link.download = `war_map_${Date.now()}.png`;
+        link.href = temp.toDataURL('image/png');
+        link.click();
+        infoBar.innerHTML = "📸 Map saved!";
+    }
+    
+    // ========== EVENT HANDLERS ==========
+    let clickTimer = null;
+    
+    function onCanvasClick(e) {
+        if (dragStarted) return;
+        const rect = unitCanvas.getBoundingClientRect();
+        const scaleX = unitCanvas.width / rect.width;
+        const scaleY = unitCanvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        const clicked = getUnitAt(mx, my);
+        if (clicked) {
+            if (clickTimer) clearTimeout(clickTimer);
+            clickTimer = setTimeout(() => { selectUnit(clicked); clickTimer = null; }, 200);
+        } else {
+            addUnit(selectedUnitType, mx, my);
+        }
+    }
+    
+    function onDoubleClick(e) {
+        if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+        const rect = unitCanvas.getBoundingClientRect();
+        const scaleX = unitCanvas.width / rect.width;
+        const scaleY = unitCanvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        const clicked = getUnitAt(mx, my);
+        if (clicked) deleteUnit(clicked);
+        e.preventDefault();
+    }
+    
+    function onContextMenu(e) {
+        e.preventDefault();
+        changeSelectedUnitFlag();
+    }
+    
+    function onMouseDown(e) {
+        const rect = unitCanvas.getBoundingClientRect();
+        const scaleX = unitCanvas.width / rect.width;
+        const scaleY = unitCanvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        const clicked = getUnitAt(mx, my);
+        if (clicked && e.button === 0) {
+            dragTargetId = clicked.id;
+            dragStartX = mx;
+            dragStartY = my;
+            isDragging = true;
+            dragStarted = false;
+            unitCanvas.style.cursor = "grabbing";
+            e.preventDefault();
+        }
+    }
+    
+    function onMouseMove(e) {
+        if (!isDragging || dragTargetId === null) return;
+        const rect = unitCanvas.getBoundingClientRect();
+        const scaleX = unitCanvas.width / rect.width;
+        const scaleY = unitCanvas.height / rect.height;
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        const dx = mx - dragStartX, dy = my - dragStartY;
+        if (!dragStarted && Math.hypot(dx, dy) > 5) dragStarted = true;
+        if (dragStarted) {
+            const unit = units.find(u => u.id === dragTargetId);
+            if (unit) {
+                unit.x = Math.min(mapWidth - 60, Math.max(60, mx));
+                unit.y = Math.min(mapHeight - 60, Math.max(60, my));
+                drawUnits();
+            }
+        }
+    }
+    
+    function onMouseUp(e) {
+        if (dragStarted && dragTargetId) {
+            const unit = units.find(u => u.id === dragTargetId);
+            if (unit) infoBar.innerHTML = `📍 MOVED: ${unit.code}`;
+        }
+        dragTargetId = null;
+        isDragging = false;
+        dragStarted = false;
+        unitCanvas.style.cursor = "crosshair";
+    }
+    
+    // Build palette with mini previews that MATCH the map icons
+    function buildPalette() {
+        unitPalette.innerHTML = "";
+        const types = Object.keys(UNIT_TYPES);
+        for (let i = 0; i < types.length; i++) {
+            const key = types[i];
+            const def = UNIT_TYPES[key];
+            const card = document.createElement("div");
+            card.className = "unit-card-compact";
+            if (selectedUnitType === key) card.classList.add("selected");
+            
+            const canvas = document.createElement("canvas");
+            canvas.width = 36;
+            canvas.height = 36;
+            canvas.style.width = "36px";
+            canvas.style.height = "36px";
+            const pCtx = canvas.getContext("2d");
+            
+            pCtx.save();
+            pCtx.translate(18, 18);
+            def.draw(pCtx, 0, 0, defaultColor1, defaultColor2);
+            pCtx.restore();
+            pCtx.beginPath();
+            pCtx.arc(18, 18, 15, 0, Math.PI*2);
+            pCtx.strokeStyle = "#b89048";
+            pCtx.lineWidth = 1.5;
+            pCtx.stroke();
+            
+            card.appendChild(canvas);
+            const span = document.createElement("span");
+            span.style.fontWeight = "bold";
+            span.style.marginLeft = "6px";
+            span.innerText = def.name;
+            card.appendChild(span);
+            
+            card.addEventListener("click", () => {
+                selectedUnitType = key;
+                document.querySelectorAll(".unit-card-compact").forEach(c => c.classList.remove("selected"));
+                card.classList.add("selected");
+                infoBar.innerHTML = `🎨 ${def.name} selected — same icon as on map!`;
+            });
+            unitPalette.appendChild(card);
+        }
+    }
+    
+    // ========== KEYBOARD (with R and I fully working) ==========
+    window.addEventListener('keydown', (e) => {
+        const key = e.key;
+        if (key === 'ArrowUp') { e.preventDefault(); navigateToDirection(0, -1, "↑ UP ↑"); }
+        else if (key === 'ArrowDown') { e.preventDefault(); navigateToDirection(0, 1, "↓ DOWN ↓"); }
+        else if (key === 'ArrowLeft') { e.preventDefault(); navigateToDirection(-1, 0, "← LEFT ←"); }
+        else if (key === 'ArrowRight') { e.preventDefault(); navigateToDirection(1, 0, "→ RIGHT →"); }
+        else if (key === 'r' || key === 'R') { e.preventDefault(); rotateSelected(); }
+        else if (key === 'i' || key === 'I') { e.preventDefault(); invertSelected(); }
+        else if (key === 'Delete' || key === 'Del') { e.preventDefault(); deleteSelected(); }
+        else if (key === 'Escape') { e.preventDefault(); selectUnit(null); }
+        
+        const num = parseInt(key);
+        if (num >= 1 && num <= 6) {
+            const types = Object.keys(UNIT_TYPES);
+            if (num-1 < types.length) {
+                selectedUnitType = types[num-1];
+                document.querySelectorAll(".unit-card-compact").forEach((c, idx) => {
+                    if (idx === num-1) c.classList.add("selected");
+                    else c.classList.remove("selected");
+                });
+                infoBar.innerHTML = `🎖️ ${UNIT_TYPES[selectedUnitType].name} selected`;
+            }
+        }
+    });
+    
+    // Attach events
+    unitCanvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    unitCanvas.addEventListener('click', onCanvasClick);
+    unitCanvas.addEventListener('dblclick', onDoubleClick);
+    unitCanvas.addEventListener('contextmenu', onContextMenu);
+    resetBtn.addEventListener('click', clearAll);
+    setDefaultFlagBtn.addEventListener('click', setDefaultFlag);
+    downloadBtn.addEventListener('click', downloadMap);
+    
+    buildPalette();
+    drawWorldMap();
+    drawUnits();
+    infoBar.innerHTML = "✅ READY: Click a unit to select → Press [R] to ROTATE (90°) → Press [I] to INVERT (mirror side) → Arrow keys navigate";
+</script>
+</body>
+</html>
