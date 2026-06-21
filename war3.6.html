@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>⚡ TACTICAL MAP · COUNTRY COLORS</title>
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- html2canvas for screenshot -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Font Awesome 6 (free) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { box-sizing: border-box; user-select: none; }
+        html, body { margin: 0; padding: 0; height: 100%; width: 100%; background: #0a1f12; font-family: 'Segoe UI', 'Georgia', serif; }
+        body { display: flex; justify-content: center; align-items: center; padding: 8px; min-height: 100vh; }
+        .war-room {
+            background: #1a150edd; backdrop-filter: blur(3px);
+            border-radius: 32px; padding: 10px;
+            border: 3px solid #dba551;
+            width: 100%; max-width: 1500px; height: 96vh; max-height: 1000px;
+            display: flex; flex-direction: column;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.8);
+        }
+        .top-bar {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+            gap: 5px; background: #18140cee; border-radius: 60px; padding: 6px 12px;
+            margin-bottom: 8px; border: 2px solid #e2bc6e; flex-shrink: 0;
+        }
+        .palette { display: flex; gap: 4px; background: #0f0a05aa; padding: 4px 10px; border-radius: 60px; flex-wrap: wrap; }
+        .unit-btn {
+            background: #2f2a1f; border: 2px solid #b89048; border-radius: 40px;
+            padding: 4px 10px; cursor: pointer; display: flex; align-items: center; gap: 5px;
+            color: #fce6b4; font-weight: bold; transition: 0.1s ease; font-size: 0.75rem;
+        }
+        .unit-btn.active { background: #5f794b; border-color: #ffd966; box-shadow: 0 0 10px gold; transform: scale(1.02); }
+        .unit-btn i { font-size: 0.95rem; }
+        .btn {
+            background: #3c2b1a; border: none; padding: 4px 10px; border-radius: 60px;
+            color: #fce6b4; cursor: pointer; font-weight: bold; font-size: 0.7rem;
+            transition: all 0.1s; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+        }
+        .btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .btn:active { transform: translateY(2px); }
+        .btn-danger { background: #8b3a2a; }
+        .btn-info { background: #2a5f6b; }
+        .btn-success { background: #2a6b3a; }
+        .btn-warning { background: #6b4a2a; }
+        .btn-primary { background: #2a4a6b; }
+        .btn-purple { background: #6b2a4a; }
+        .btn-rotate { background: #8a6a2a; }
+        .btn-rotate-small { background: #6a5a2a; }
+        .btn-download { background: #2a6b5a; }
+        .flag-select {
+            background: #3c2e1c; color: #ffefcf; border: 2px solid #e6bc6e;
+            border-radius: 40px; padding: 3px 8px; font-weight: bold;
+            font-family: monospace; min-width: 90px; font-size: 0.7rem;
+            cursor: pointer;
+        }
+        .flag-select option { background: #2a2418; color: #ffefcf; }
+        .map-wrapper { flex: 1; min-height: 0; border-radius: 18px; border: 4px solid #ecd99b; box-shadow: inset 0 0 0 6px #5a3e1f; overflow: hidden; position: relative; width: 100%; }
+        #map { width: 100%; height: 100%; background: #1a6b7a; cursor: crosshair; }
+        .leaflet-control-zoom { border: 2px solid #dba551; }
+        .leaflet-control-zoom a { font-size: 16px; line-height: 24px; }
+        .leaflet-popup-content { font-size: 0.7rem; }
+        .unit-marker { display: flex; flex-direction: column; align-items: center; text-shadow: 0 2px 6px black; transition: transform 0.15s ease; }
+        .unit-marker.selected { filter: drop-shadow(0 0 14px gold); transform: scale(1.12); }
+        .marker-body {
+            display: flex; gap: 4px; align-items: center;
+            background: rgba(0,0,0,0.85); padding: 3px 8px; border-radius: 30px;
+            border: 2px solid #b89048; backdrop-filter: blur(2px); transition: border 0.2s;
+        }
+        .marker-body.selected-border { border-color: #ffd700; }
+        .health-bar { width: 34px; height: 4px; background: #330000; border-radius: 2px; margin-top: 2px; overflow: hidden; border: 1px solid #555; }
+        .health-fill { height: 100%; transition: width 0.2s; }
+        .rot-badge { font-size: 8px; color: #ffaa44; font-weight: bold; margin-left: 2px; }
+        .inv-badge { font-size: 8px; color: #44aaff; margin-left: 2px; }
+        .status {
+            margin-top: 8px; background: #020812cc; border-radius: 14px;
+            padding: 5px 12px; font-family: monospace; color: #d4f0b0;
+            border: 1px solid #ad8842; display: flex; flex-wrap: wrap;
+            justify-content: space-between; align-items: center; gap: 5px;
+            font-size: 0.65rem; flex-shrink: 0;
+        }
+        .context-menu {
+            display: none; position: fixed; background: #2a2418;
+            border: 2px solid #dba551; border-radius: 8px; padding: 4px 0;
+            z-index: 9999; min-width: 140px;
+        }
+        .context-item { padding: 6px 16px; color: #ffefcf; cursor: pointer; font-size: 0.75rem; }
+        .context-item:hover { background: #5f794b; }
+        .modal {
+            display: none; position: fixed; top:0;left:0;width:100%;height:100%;
+            background: rgba(0,0,0,0.7); z-index: 10000;
+            justify-content: center; align-items: center;
+        }
+        .modal-box {
+            background: #1a150e; border: 2px solid #dba551; border-radius: 20px;
+            padding: 18px; max-width: 420px; color: #ffefcf; max-height: 80vh; overflow-y: auto;
+        }
+        .modal-box h3 { color: #ffd966; margin-top:0; font-size: 1rem; }
+        .modal-box pre { background: #0a0a0a; padding: 10px; border-radius: 8px; font-size: 0.7rem; }
+        .arrow-hint {
+            background: rgba(0,0,0,0.4); padding: 2px 10px; border-radius: 12px;
+            border: 1px solid #dba551; font-size: 0.65rem;
+            display: inline-flex; align-items: center; gap: 5px; color: #ffefcf;
+        }
+        .current-flag-display {
+            background: #0f0a05aa; padding: 2px 10px; border-radius: 40px;
+            border: 1px solid #dba551; font-size: 0.8rem;
+            display: flex; align-items: center; gap: 4px;
+            color: #ffefcf;
+        }
+        @media (max-width: 700px) {
+            .war-room { height: 98vh; padding: 6px; }
+            .top-bar { gap: 3px; padding: 4px 8px; }
+            .unit-btn { font-size: 0.6rem; padding: 3px 7px; }
+            .unit-btn i { font-size: 0.8rem; }
+            .btn { font-size: 0.6rem; padding: 3px 7px; }
+            .flag-select { font-size: 0.6rem; min-width: 65px; padding: 2px 6px; }
+            .current-flag-display { font-size: 0.6rem; padding: 2px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="war-room">
+    <div class="top-bar">
+        <div class="palette" id="paletteContainer"></div>
+        <select class="flag-select" id="flagSelect"></select>
+        <span class="current-flag-display" id="currentFlagDisplay">🇺🇸 USA</span>
+        <button class="btn btn-rotate" id="rotateBtn"><i class="fas fa-undo-alt"></i> +15°</button>
+        <button class="btn btn-rotate-small" id="rotateBtnMinus"><i class="fas fa-undo-alt"></i> -15°</button>
+        <button class="btn btn-warning" id="undoBtn"><i class="fas fa-undo"></i></button>
+        <button class="btn btn-warning" id="redoBtn"><i class="fas fa-redo"></i></button>
+        <button class="btn btn-primary" id="saveBtn"><i class="fas fa-save"></i></button>
+        <button class="btn btn-purple" id="loadBtn"><i class="fas fa-folder-open"></i></button>
+        <button class="btn btn-danger" id="clearBtn"><i class="fas fa-trash"></i></button>
+        <button class="btn btn-download" id="downloadBtn"><i class="fas fa-download"></i> PNG</button>
+        <button class="btn" id="helpBtn"><i class="fas fa-question-circle"></i></button>
+        <span class="arrow-hint"><i class="fas fa-arrow-up"></i><i class="fas fa-arrow-down"></i><i class="fas fa-arrow-left"></i><i class="fas fa-arrow-right"></i> Select</span>
+    </div>
+
+    <div class="map-wrapper" id="mapWrapper">
+        <div id="map"></div>
+    </div>
+
+    <div class="status">
+        <span id="infoBar"><i class="fas fa-globe"></i> READY</span>
+        <span id="unitCounter"><i class="fas fa-users"></i> Units: 0</span>
+        <span id="selectionInfo"><i class="fas fa-crosshairs"></i> None</span>
+    </div>
+</div>
+
+<div class="context-menu" id="contextMenu">
+    <div class="context-item" data-action="health">❤️ Set Health</div>
+    <div class="context-item" data-action="rotate">🔄 +15°</div>
+    <div class="context-item" data-action="rotate-minus">🔄 -15°</div>
+    <div class="context-item" data-action="invert">🪞 Invert</div>
+    <div class="context-item" data-action="delete">🗑️ Delete</div>
+    <div class="context-item" data-action="duplicate">📋 Duplicate</div>
+</div>
+
+<div class="modal" id="helpModal">
+    <div class="modal-box">
+        <h3><i class="fas fa-keyboard"></i> Shortcuts</h3>
+        <pre>
+↑ ↓ ← →  - Navigate/select units by direction
+1-6      - Select unit type
+R        - Rotate +15°
+Shift+R  - Rotate -15°
+I        - Invert selected
+Del      - Delete selected
+G        - Group selected
+U        - Ungroup selected
+Ctrl+C/V - Copy/Paste
+Ctrl+Z/Y - Undo/Redo
+Esc      - Clear selection
+?        - Help
+        </pre>
+        <button class="btn btn-info" onclick="document.getElementById('helpModal').style.display='none'">Close</button>
+    </div>
+</div>
+
+<script>
+    // ========== LEAFLET INIT ==========
+    const map = L.map('map', { 
+        center: [20, 0], 
+        zoom: 2,
+        zoomControl: true,
+        fadeAnimation: true,
+        attributionControl: false
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap, CartoDB',
+        subdomains: 'abcd',
+        maxZoom: 19,
+        minZoom: 1
+    }).addTo(map);
+
+    setTimeout(() => { map.invalidateSize(); }, 200);
+
+    // ========== UNIT TYPES ==========
+    const UNIT_TYPES = {
+        tank: { name: 'TANK', icon: 'fa-truck', health: 45 },
+        heli: { name: 'HELI', icon: 'fa-helicopter', health: 38 },
+        soldier: { name: 'SOLDIER', icon: 'fa-user-shield', health: 22 },
+        ship: { name: 'SHIP', icon: 'fa-ship', health: 52 },
+        plane: { name: 'PLANE', icon: 'fa-plane', health: 48 },
+        artillery: { name: 'ARTILLERY', icon: 'fa-rocket', health: 55 }
+    };
+    const TYPE_KEYS = Object.keys(UNIT_TYPES);
+
+    // ========== NATIONS with flag colors ==========
+    const NATIONS = [
+        { flag: '🇺🇸', code: 'USA', c1: '#b22234', c2: '#3c3b6e' },
+        { flag: '🇬🇧', code: 'UK', c1: '#012169', c2: '#c8102e' },
+        { flag: '🇫🇷', code: 'FRA', c1: '#0055a4', c2: '#ef4135' },
+        { flag: '🇩🇪', code: 'GER', c1: '#000000', c2: '#dd0000' },
+        { flag: '🇮🇹', code: 'ITA', c1: '#009246', c2: '#ce2b37' },
+        { flag: '🇪🇸', code: 'ESP', c1: '#aa151b', c2: '#f1bf00' },
+        { flag: '🇷🇺', code: 'RUS', c1: '#0033a0', c2: '#da291c' },
+        { flag: '🇨🇦', code: 'CAN', c1: '#ff0000', c2: '#ffffff' },
+        { flag: '🇧🇷', code: 'BRA', c1: '#009c3b', c2: '#ffdf00' },
+        { flag: '🇯🇵', code: 'JPN', c1: '#bc002d', c2: '#ffffff' },
+        { flag: '🇨🇳', code: 'CHN', c1: '#de2910', c2: '#ffde00' },
+        { flag: '🇮🇳', code: 'IND', c1: '#ff9933', c2: '#138808' },
+        { flag: '🇺🇦', code: 'UKR', c1: '#0057b8', c2: '#ffd700' },
+        { flag: '🇵🇸', code: 'PLE', c1: '#007a3d', c2: '#000000' },
+        { flag: '🇮🇱', code: 'ISR', c1: '#0038b8', c2: '#ffffff' },
+        { flag: '🇦🇺', code: 'AUS', c1: '#00008b', c2: '#ff0000' },
+        { flag: '🇦🇷', code: 'ARG', c1: '#75aadb', c2: '#ffffff' },
+        { flag: '🇨🇱', code: 'CHL', c1: '#0039a6', c2: '#ffffff' },
+        { flag: '🇨🇴', code: 'COL', c1: '#ffe800', c2: '#003893' },
+        { flag: '🇵🇪', code: 'PER', c1: '#d91023', c2: '#ffffff' },
+        { flag: '🇵🇱', code: 'POL', c1: '#dc143c', c2: '#ffffff' }
+    ];
+
+    // ========== STATE ==========
+    let units = [];
+    let nextId = 1;
+    let selectedIds = new Set();
+    let lastSelectedId = null;
+    let selectedType = 'tank';
+    let currentNation = NATIONS.find(n => n.code === 'USA');  // Current faction for NEW units
+    let groups = new Map();
+    let nextGroupId = 1;
+    let clipboard = [];
+    let history = [];
+    let historyIndex = -1;
+    const MAX_HISTORY = 40;
+    const ROTATION_STEP = 15;
+
+    const paletteEl = document.getElementById('paletteContainer');
+    const flagSelect = document.getElementById('flagSelect');
+    const currentFlagDisplay = document.getElementById('currentFlagDisplay');
+    const infoBar = document.getElementById('infoBar');
+    const unitCounter = document.getElementById('unitCounter');
+    const selectionInfo = document.getElementById('selectionInfo');
+    const contextMenu = document.getElementById('contextMenu');
+
+    // ========== UNIT CLASS ==========
+    class Unit {
+        constructor(id, type, lat, lng, groupId = null) {
+            this.id = id;
+            this.type = type;
+            this.lat = lat;
+            this.lng = lng;
+            this.health = UNIT_TYPES[type].health;
+            this.maxHealth = UNIT_TYPES[type].health;
+            this.rotation = 0;
+            this.inverted = false;
+            // Each unit stores its OWN country data (set at creation time)
+            this.flag = currentNation.flag;
+            this.code = currentNation.code;
+            this.color1 = currentNation.c1;
+            this.color2 = currentNation.c2;
+            this.groupId = groupId;
+            this.marker = null;
+        }
+        setFlag(flag, code, c1, c2) { 
+            this.flag = flag; 
+            this.code = code; 
+            this.color1 = c1; 
+            this.color2 = c2; 
+        }
+        setHealth(h) { this.health = Math.min(this.maxHealth, Math.max(0, h)); }
+        rotate(degrees) { this.rotation = (this.rotation + degrees) % 360; if (this.rotation < 0) this.rotation += 360; }
+        invert() { this.inverted = !this.inverted; }
+    }
+
+    // ========== MARKER RENDERING ==========
+    function createUnitIcon(unit, selected = false) {
+        const typeInfo = UNIT_TYPES[unit.type];
+        const healthPct = Math.round((unit.health / unit.maxHealth) * 100);
+        const healthColor = healthPct > 60 ? '#44ff44' : healthPct > 30 ? '#ffaa44' : '#ff4444';
+        const rotDeg = unit.rotation || 0;
+        const invertStyle = unit.inverted ? 'scaleX(-1)' : '';
+        const transformStyle = `transform: rotate(${rotDeg}deg) ${invertStyle};`;
+
+        // Use the unit's OWN color1 (set when it was created)
+        const iconColor = unit.color1;
+
+        const html = `
+            <div class="unit-marker ${selected ? 'selected' : ''}" style="display:flex; flex-direction:column; align-items:center;">
+                <div class="marker-body ${selected ? 'selected-border' : ''}" style="display:flex; gap:4px; align-items:center; background:rgba(0,0,0,0.85); padding:3px 8px; border-radius:30px; border:2px solid ${selected ? '#ffd700' : '#b89048'}; backdrop-filter:blur(2px);">
+                    <span style="font-size:14px; line-height:1;">${unit.flag}</span>
+                    <div style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; ${transformStyle}">
+                        <i class="fas ${typeInfo.icon}" style="color:${iconColor}; font-size:20px; filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));"></i>
+                    </div>
+                    <span style="font-size:9px; font-weight:bold; color:white; background:rgba(0,0,0,0.5); padding:0 5px; border-radius:4px;">${unit.code}</span>
+                    ${unit.rotation !== 0 ? `<span class="rot-badge">${unit.rotation}°</span>` : ''}
+                    ${unit.inverted ? '<span class="inv-badge">⇄</span>' : ''}
+                </div>
+                <div class="health-bar">
+                    <div class="health-fill" style="width:${healthPct}%; background:${healthColor};"></div>
+                </div>
+            </div>
+        `;
+        return L.divIcon({
+            className: '',
+            html: html,
+            iconSize: [60, 44],
+            iconAnchor: [30, 22],
+            popupAnchor: [0, -16]
+        });
+    }
+
+    function updateMarker(unit) {
+        if (unit.marker) {
+            const selected = selectedIds.has(unit.id);
+            unit.marker.setIcon(createUnitIcon(unit, selected));
+        }
+    }
+
+    function addUnitToMap(unit) {
+        const marker = L.marker([unit.lat, unit.lng], {
+            icon: createUnitIcon(unit, false),
+            draggable: true,
+            autoPan: true
+        }).addTo(map);
+
+        marker.on('dragend', function(e) {
+            const pos = marker.getLatLng();
+            unit.lat = pos.lat;
+            unit.lng = pos.lng;
+            updateMarker(unit);
+            saveHistory();
+            updateUI();
+        });
+
+        marker.on('click', function(e) {
+            if (e.originalEvent.ctrlKey) {
+                toggleSelectUnit(unit.id);
+            } else {
+                selectUnit(unit.id);
+            }
+            e.originalEvent.stopPropagation();
+        });
+
+        marker.on('dblclick', function(e) {
+            deleteUnit(unit.id);
+            e.originalEvent.stopPropagation();
+        });
+
+        marker.on('contextmenu', function(e) {
+            if (!selectedIds.has(unit.id)) selectUnit(unit.id);
+            contextMenu.style.display = 'block';
+            contextMenu.style.left = e.originalEvent.clientX + 'px';
+            contextMenu.style.top = e.originalEvent.clientY + 'px';
+            e.originalEvent.preventDefault();
+        });
+
+        unit.marker = marker;
+        return marker;
+    }
+
+    function removeUnitFromMap(unit) {
+        if (unit.marker) {
+            map.removeLayer(unit.marker);
+            unit.marker = null;
+        }
+    }
+
+    // ========== CORE OPERATIONS ==========
+    function addUnit(type, lat, lng) {
+        // Create unit with CURRENT country selection
+        const unit = new Unit(nextId++, type, lat, lng);
+        units.push(unit);
+        addUnitToMap(unit);
+        selectUnit(unit.id);
+        saveHistory();
+        updateUI();
+        return unit;
+    }
+
+    function deleteUnit(id) {
+        const idx = units.findIndex(u => u.id === id);
+        if (idx === -1) return;
+        const unit = units[idx];
+        removeUnitFromMap(unit);
+        if (unit.groupId) {
+            const g = groups.get(unit.groupId);
+            if (g) { g.delete(id); if (g.size === 0) groups.delete(unit.groupId); }
+        }
+        units.splice(idx, 1);
+        selectedIds.delete(id);
+        if (lastSelectedId === id) lastSelectedId = null;
+        saveHistory();
+        updateUI();
+    }
+
+    function selectUnit(id) {
+        selectedIds.clear();
+        if (id !== undefined) {
+            selectedIds.add(id);
+            lastSelectedId = id;
+        }
+        refreshMarkers();
+        updateUI();
+    }
+
+    function toggleSelectUnit(id) {
+        if (selectedIds.has(id)) {
+            selectedIds.delete(id);
+            if (lastSelectedId === id) lastSelectedId = null;
+        } else {
+            selectedIds.add(id);
+            lastSelectedId = id;
+        }
+        refreshMarkers();
+        updateUI();
+    }
+
+    function clearSelection() {
+        selectedIds.clear();
+        lastSelectedId = null;
+        refreshMarkers();
+        updateUI();
+    }
+
+    function refreshMarkers() {
+        units.forEach(u => updateMarker(u));
+    }
+
+    function getSelectedUnits() {
+        return units.filter(u => selectedIds.has(u.id));
+    }
+
+    // ========== CHANGE COUNTRY FOR NEW UNITS ONLY ==========
+    function setCurrentCountry(nation) {
+        currentNation = nation;
+        // Update the display
+        currentFlagDisplay.textContent = `${nation.flag} ${nation.code}`;
+        // Update palette icons to show the new country color (for preview)
+        document.querySelectorAll('.unit-btn').forEach(btn => {
+            const icon = btn.querySelector('i');
+            if (icon) icon.style.color = nation.c1;
+        });
+        infoBar.innerHTML = `🎯 Now placing units for ${nation.flag} ${nation.code}`;
+    }
+
+    // ========== ARROW NAVIGATION ==========
+    function navigateUnits(dx, dy, dirName) {
+        if (units.length === 0) {
+            infoBar.innerHTML = '⚠️ No units on map!';
+            return;
+        }
+        
+        if (lastSelectedId === null || !units.some(u => u.id === lastSelectedId)) {
+            selectUnit(units[0].id);
+            const u = units[0];
+            infoBar.innerHTML = `🎯 Selected: ${u.flag} ${u.code} ${UNIT_TYPES[u.type].name}`;
+            map.panTo([u.lat, u.lng]);
+            return;
+        }
+        
+        const current = units.find(u => u.id === lastSelectedId);
+        if (!current) {
+            selectUnit(units[0].id);
+            return;
+        }
+        
+        let best = null;
+        let bestScore = -Infinity;
+        
+        for (let u of units) {
+            if (u.id === current.id) continue;
+            const deltaLat = u.lat - current.lat;
+            const deltaLng = u.lng - current.lng;
+            const dist = Math.hypot(deltaLat, deltaLng);
+            if (dist < 0.0001) continue;
+            
+            const angle = Math.atan2(dy, dx);
+            const unitAngle = Math.atan2(deltaLat, deltaLng);
+            let angleDiff = Math.abs(unitAngle - angle);
+            angleDiff = Math.min(angleDiff, Math.PI * 2 - angleDiff);
+            
+            if (angleDiff > Math.PI * 0.75) continue;
+            
+            const alignment = 1 - (angleDiff / Math.PI);
+            const proximity = Math.max(0, 1 - (dist / 80));
+            const score = alignment * 0.7 + proximity * 0.3;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                best = u;
+            }
+        }
+        
+        if (best) {
+            selectUnit(best.id);
+            infoBar.innerHTML = `🎯 ${dirName}: ${best.flag} ${best.code} ${UNIT_TYPES[best.type].name}`;
+            map.panTo([best.lat, best.lng]);
+        } else {
+            let closest = null;
+            let closestDist = Infinity;
+            
+            for (let u of units) {
+                if (u.id === current.id) continue;
+                const deltaLat = u.lat - current.lat;
+                const deltaLng = u.lng - current.lng;
+                const dist = Math.hypot(deltaLat, deltaLng);
+                const angle = Math.atan2(dy, dx);
+                const unitAngle = Math.atan2(deltaLat, deltaLng);
+                let angleDiff = Math.abs(unitAngle - angle);
+                angleDiff = Math.min(angleDiff, Math.PI * 2 - angleDiff);
+                
+                if (angleDiff < Math.PI * 0.5 && dist < closestDist) {
+                    closestDist = dist;
+                    closest = u;
+                }
+            }
+            
+            if (closest) {
+                selectUnit(closest.id);
+                infoBar.innerHTML = `↪️ ${dirName} (nearest): ${closest.flag} ${closest.code} ${UNIT_TYPES[closest.type].name}`;
+                map.panTo([closest.lat, closest.lng]);
+            } else {
+                const currentIdx = units.findIndex(u => u.id === current.id);
+                const nextIdx = (currentIdx + 1) % units.length;
+                const next = units[nextIdx];
+                selectUnit(next.id);
+                infoBar.innerHTML = `↪️ Cycle: ${next.flag} ${next.code} ${UNIT_TYPES[next.type].name}`;
+                map.panTo([next.lat, next.lng]);
+            }
+        }
+    }
+
+    // ========== DOWNLOAD MAP AS PNG ==========
+    function downloadMapPNG() {
+        const wrapper = document.getElementById('mapWrapper');
+        const originalOverflow = wrapper.style.overflow;
+        wrapper.style.overflow = 'visible';
+        
+        html2canvas(wrapper, {
+            scale: 1.5,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#1a6b7a',
+            logging: false
+        }).then(canvas => {
+            wrapper.style.overflow = originalOverflow;
+            const link = document.createElement('a');
+            link.download = `tactical_map_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            infoBar.innerHTML = '📸 Map saved as PNG!';
+        }).catch(err => {
+            wrapper.style.overflow = originalOverflow;
+            infoBar.innerHTML = '❌ Failed to save map';
+            console.error(err);
+        });
+    }
+
+    // ========== ACTIONS ==========
+    function rotateSelected(degrees) {
+        getSelectedUnits().forEach(u => u.rotate(degrees));
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = `🔄 Rotated ${degrees}°`;
+    }
+
+    function invertSelected() {
+        getSelectedUnits().forEach(u => u.invert());
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = '🪞 Inverted';
+    }
+
+    function deleteSelected() {
+        const ids = Array.from(selectedIds);
+        ids.forEach(id => deleteUnit(id));
+        clearSelection();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = '🗑️ Deleted';
+    }
+
+    function duplicateSelected() {
+        const newIds = [];
+        getSelectedUnits().forEach(u => {
+            const offset = 0.015;
+            const nu = new Unit(nextId++, u.type, u.lat + (Math.random()-0.5)*offset, u.lng + (Math.random()-0.5)*offset);
+            // Copy the ORIGINAL unit's country data, not the current one
+            nu.setFlag(u.flag, u.code, u.color1, u.color2);
+            nu.rotation = u.rotation;
+            nu.inverted = u.inverted;
+            units.push(nu);
+            addUnitToMap(nu);
+            newIds.push(nu.id);
+        });
+        selectedIds.clear();
+        newIds.forEach(id => selectedIds.add(id));
+        if (newIds.length) lastSelectedId = newIds[0];
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = `📋 Duplicated ${newIds.length}`;
+    }
+
+    function groupSelected() {
+        const sel = getSelectedUnits();
+        if (sel.length < 2) { infoBar.innerHTML = '⚠️ Select at least 2'; return; }
+        const gid = nextGroupId++;
+        const ids = sel.map(u => u.id);
+        groups.set(gid, new Set(ids));
+        ids.forEach(id => { const u = units.find(unit => unit.id === id); if (u) u.groupId = gid; });
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = `🔗 Grouped ${ids.length}`;
+    }
+
+    function ungroupSelected() {
+        getSelectedUnits().forEach(u => {
+            if (u.groupId) {
+                const g = groups.get(u.groupId);
+                if (g) g.delete(u.id);
+                if (g && g.size === 0) groups.delete(u.groupId);
+                u.groupId = null;
+            }
+        });
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = '🔓 Ungrouped';
+    }
+
+    function setHealthSelected() {
+        const val = prompt('Set health (0-100):', '100');
+        if (val === null) return;
+        const h = parseInt(val);
+        if (isNaN(h)) return;
+        getSelectedUnits().forEach(u => u.setHealth(h));
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = `❤️ Health set to ${h}`;
+    }
+
+    function copySelected() {
+        clipboard = getSelectedUnits().map(u => ({
+            type: u.type, flag: u.flag, code: u.code,
+            color1: u.color1, color2: u.color2,
+            rotation: u.rotation, inverted: u.inverted
+        }));
+        infoBar.innerHTML = `📋 Copied ${clipboard.length}`;
+    }
+
+    function pasteUnits() {
+        if (!clipboard.length) return;
+        const newIds = [];
+        clipboard.forEach(t => {
+            const lat = 20 + (Math.random()-0.5)*30;
+            const lng = (Math.random()-0.5)*60;
+            const nu = new Unit(nextId++, t.type, lat, lng);
+            // Use the clipboard country data
+            nu.setFlag(t.flag, t.code, t.color1, t.color2);
+            nu.rotation = t.rotation;
+            nu.inverted = t.inverted;
+            units.push(nu);
+            addUnitToMap(nu);
+            newIds.push(nu.id);
+        });
+        selectedIds.clear();
+        newIds.forEach(id => selectedIds.add(id));
+        if (newIds.length) lastSelectedId = newIds[0];
+        refreshMarkers();
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = `📋 Pasted ${clipboard.length}`;
+    }
+
+    function clearAll() {
+        units.forEach(u => removeUnitFromMap(u));
+        units = [];
+        selectedIds.clear();
+        groups.clear();
+        nextId = 1;
+        lastSelectedId = null;
+        saveHistory();
+        updateUI();
+        infoBar.innerHTML = '🗑️ All cleared';
+    }
+
+    // ========== HISTORY ==========
+    function saveHistory() {
+        const state = serializeState();
+        history = history.slice(0, historyIndex + 1);
+        history.push(state);
+        if (history.length > MAX_HISTORY) history.shift();
+        historyIndex = history.length - 1;
+    }
+
+    function serializeState() {
+        return JSON.stringify({
+            units: units.map(u => ({ id:u.id, type:u.type, lat:u.lat, lng:u.lng, health:u.health,
+                rotation:u.rotation, inverted:u.inverted, flag:u.flag, code:u.code,
+                color1:u.color1, color2:u.color2, groupId:u.groupId })),
+            nextId, groups: Array.from(groups.entries()).map(([k,v]) => [k, Array.from(v)]),
+            selectedIds: Array.from(selectedIds)
+        });
+    }
+
+    function deserializeState(json) {
+        const data = JSON.parse(json);
+        units.forEach(u => removeUnitFromMap(u));
+        units = [];
+        groups = new Map();
+        selectedIds.clear();
+
+        data.units.forEach(u => {
+            const nu = new Unit(u.id, u.type, u.lat, u.lng, u.groupId);
+            nu.health = u.health; nu.rotation = u.rotation; nu.inverted = u.inverted;
+            nu.setFlag(u.flag, u.code, u.color1, u.color2);
+            units.push(nu);
+            addUnitToMap(nu);
+        });
+        nextId = data.nextId;
+        data.groups.forEach(([k, v]) => groups.set(k, new Set(v)));
+        data.selectedIds.forEach(id => selectedIds.add(id));
+        lastSelectedId = data.selectedIds.length ? data.selectedIds[0] : null;
+        refreshMarkers();
+        updateUI();
+    }
+
+    function undo() {
+        if (historyIndex <= 0) { infoBar.innerHTML = '⚠️ No undo'; return; }
+        historyIndex--;
+        deserializeState(history[historyIndex]);
+        infoBar.innerHTML = '↩️ Undo';
+    }
+
+    function redo() {
+        if (historyIndex >= history.length - 1) { infoBar.innerHTML = '⚠️ No redo'; return; }
+        historyIndex++;
+        deserializeState(history[historyIndex]);
+        infoBar.innerHTML = '↪️ Redo';
+    }
+
+    function saveScenario() {
+        localStorage.setItem('tactical_leaflet', serializeState());
+        infoBar.innerHTML = '💾 Saved';
+    }
+
+    function loadScenario() {
+        const data = localStorage.getItem('tactical_leaflet');
+        if (!data) { infoBar.innerHTML = '❌ No save'; return; }
+        deserializeState(data);
+        history = [data];
+        historyIndex = 0;
+        infoBar.innerHTML = '📂 Loaded';
+    }
+
+    // ========== UI UPDATE ==========
+    function updateUI() {
+        unitCounter.innerHTML = `<i class="fas fa-users"></i> Units: ${units.length}`;
+        const sel = getSelectedUnits();
+        if (sel.length === 0) selectionInfo.innerHTML = `<i class="fas fa-crosshairs"></i> None`;
+        else if (sel.length === 1) selectionInfo.innerHTML = `<i class="fas fa-crosshairs"></i> ${sel[0].flag} ${sel[0].code} ${UNIT_TYPES[sel[0].type].name}`;
+        else selectionInfo.innerHTML = `<i class="fas fa-crosshairs"></i> ${sel.length} units`;
+        refreshMarkers();
+    }
+
+    // ========== PALETTE & FLAG ==========
+    function buildPalette() {
+        paletteEl.innerHTML = '';
+        TYPE_KEYS.forEach(key => {
+            const info = UNIT_TYPES[key];
+            const btn = document.createElement('div');
+            btn.className = `unit-btn ${selectedType === key ? 'active' : ''}`;
+            btn.innerHTML = `<i class="fas ${info.icon}" style="color:${currentNation.c1}"></i> <span>${info.name}</span>`;
+            btn.dataset.type = key;
+            btn.addEventListener('click', () => {
+                selectedType = key;
+                document.querySelectorAll('.unit-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                infoBar.innerHTML = `⚡ ${info.name} selected`;
+            });
+            paletteEl.appendChild(btn);
+        });
+    }
+
+    function buildFlagDropdown() {
+        flagSelect.innerHTML = '';
+        NATIONS.forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = `${n.flag}|${n.code}|${n.c1}|${n.c2}`;
+            opt.textContent = `${n.flag} ${n.code}`;
+            if (n.code === currentNation.code) opt.selected = true;
+            flagSelect.appendChild(opt);
+        });
+        flagSelect.addEventListener('change', function() {
+            const val = this.value;
+            const parts = val.split('|');
+            const newNation = { flag: parts[0], code: parts[1], c1: parts[2], c2: parts[3] };
+            // Set the current country for NEW units only
+            setCurrentCountry(newNation);
+        });
+    }
+
+    // ========== MAP CLICK ==========
+    map.on('click', function(e) {
+        contextMenu.style.display = 'none';
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        const clicked = units.some(u => {
+            const dist = map.distance([lat, lng], [u.lat, u.lng]);
+            return dist < 25;
+        });
+        if (!clicked) {
+            // Create unit with CURRENT country
+            addUnit(selectedType, lat, lng);
+        }
+    });
+
+    // ========== KEYBOARD ==========
+    document.addEventListener('keydown', (e) => {
+        const key = e.key;
+        
+        if (key === 'ArrowUp') { e.preventDefault(); navigateUnits(0, 1, '↑ Up'); }
+        else if (key === 'ArrowDown') { e.preventDefault(); navigateUnits(0, -1, '↓ Down'); }
+        else if (key === 'ArrowLeft') { e.preventDefault(); navigateUnits(-1, 0, '← Left'); }
+        else if (key === 'ArrowRight') { e.preventDefault(); navigateUnits(1, 0, '→ Right'); }
+        else if (key === 'r' || key === 'R') { 
+            e.preventDefault(); 
+            if (e.shiftKey) {
+                rotateSelected(-ROTATION_STEP);
+            } else {
+                rotateSelected(ROTATION_STEP);
+            }
+        }
+        else if (key === 'i' || key === 'I') { e.preventDefault(); invertSelected(); }
+        else if (key === 'Delete' || key === 'Del') { e.preventDefault(); deleteSelected(); }
+        else if (key === 'g' || key === 'G') { e.preventDefault(); groupSelected(); }
+        else if (key === 'u' || key === 'U') { e.preventDefault(); ungroupSelected(); }
+        else if (key === 'Escape') { e.preventDefault(); clearSelection(); }
+        else if (key === '?' || key === '/') { e.preventDefault(); document.getElementById('helpModal').style.display='flex'; }
+        else if (e.ctrlKey && key === 'z') { e.preventDefault(); undo(); }
+        else if (e.ctrlKey && key === 'y') { e.preventDefault(); redo(); }
+        else if (e.ctrlKey && key === 'c') { e.preventDefault(); copySelected(); }
+        else if (e.ctrlKey && key === 'v') { e.preventDefault(); pasteUnits(); }
+        else if (e.ctrlKey && key === 's') { e.preventDefault(); saveScenario(); }
+        else if (e.ctrlKey && key === 'l') { e.preventDefault(); loadScenario(); }
+        const num = parseInt(key);
+        if (num >= 1 && num <= 6) {
+            const idx = num - 1;
+            if (idx < TYPE_KEYS.length) {
+                selectedType = TYPE_KEYS[idx];
+                document.querySelectorAll('.unit-btn').forEach((b, i) => {
+                    b.classList.toggle('active', i === idx);
+                });
+                infoBar.innerHTML = `🎖️ ${UNIT_TYPES[selectedType].name} selected`;
+            }
+        }
+    });
+
+    // ========== CONTEXT MENU ==========
+    document.querySelectorAll('.context-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const action = item.dataset.action;
+            if (action === 'health') setHealthSelected();
+            else if (action === 'rotate') rotateSelected(ROTATION_STEP);
+            else if (action === 'rotate-minus') rotateSelected(-ROTATION_STEP);
+            else if (action === 'invert') invertSelected();
+            else if (action === 'delete') deleteSelected();
+            else if (action === 'duplicate') duplicateSelected();
+            contextMenu.style.display = 'none';
+        });
+    });
+    document.addEventListener('click', () => contextMenu.style.display = 'none');
+
+    // ========== BUTTONS ==========
+    document.getElementById('rotateBtn').addEventListener('click', () => rotateSelected(ROTATION_STEP));
+    document.getElementById('rotateBtnMinus').addEventListener('click', () => rotateSelected(-ROTATION_STEP));
+    document.getElementById('undoBtn').addEventListener('click', undo);
+    document.getElementById('redoBtn').addEventListener('click', redo);
+    document.getElementById('saveBtn').addEventListener('click', saveScenario);
+    document.getElementById('loadBtn').addEventListener('click', loadScenario);
+    document.getElementById('clearBtn').addEventListener('click', clearAll);
+    document.getElementById('downloadBtn').addEventListener('click', downloadMapPNG);
+    document.getElementById('helpBtn').addEventListener('click', () => {
+        document.getElementById('helpModal').style.display = 'flex';
+    });
+
+    // ========== INIT ==========
+    buildPalette();
+    buildFlagDropdown();
+    setCurrentCountry(currentNation);
+
+    // Demo units with mixed countries
+    const demoData = [
+        { type: 'tank', lat: 35, lng: -15, rot: 0, nation: NATIONS.find(n => n.code === 'USA') },
+        { type: 'heli', lat: 40, lng: 20, rot: 15, nation: NATIONS.find(n => n.code === 'UK') },
+        { type: 'soldier', lat: 25, lng: 30, rot: 30, nation: NATIONS.find(n => n.code === 'FRA') },
+        { type: 'ship', lat: 15, lng: -20, rot: 45, nation: NATIONS.find(n => n.code === 'GER') },
+        { type: 'plane', lat: 30, lng: -30, rot: 60, nation: NATIONS.find(n => n.code === 'RUS') },
+        { type: 'artillery', lat: 20, lng: 10, rot: 75, nation: NATIONS.find(n => n.code === 'CHN') },
+        { type: 'tank', lat: 10, lng: 40, rot: 90, nation: NATIONS.find(n => n.code === 'BRA') },
+        { type: 'heli', lat: 45, lng: -10, rot: 135, nation: NATIONS.find(n => n.code === 'JPN') },
+        { type: 'soldier', lat: 5, lng: -40, rot: 180, nation: NATIONS.find(n => n.code === 'IND') },
+        { type: 'ship', lat: -10, lng: 30, rot: 225, nation: NATIONS.find(n => n.code === 'CAN') },
+    ];
+    
+    demoData.forEach(d => {
+        const u = new Unit(nextId++, d.type, d.lat, d.lng);
+        u.rotation = d.rot;
+        u.setFlag(d.nation.flag, d.nation.code, d.nation.c1, d.nation.c2);
+        units.push(u);
+        addUnitToMap(u);
+    });
+    
+    saveHistory();
+    updateUI();
+    infoBar.innerHTML = '✅ Multiple countries on map! Select a country to place NEW units.';
+
+    // Auto-save
+    setInterval(() => {
+        saveScenario();
+        setTimeout(() => { if (infoBar.innerHTML === '💾 Saved') infoBar.innerHTML = '✅ Auto-saved'; }, 1000);
+    }, 120000);
+
+    window.addEventListener('resize', () => { map.invalidateSize(); });
+</script>
+</body>
+</html>
